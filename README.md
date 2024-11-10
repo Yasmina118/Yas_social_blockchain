@@ -10,4 +10,4 @@ Like/Dislike: Users can like or dislike posts.
 Like/Dislike Count: Display the number of likes and dislikes, along with the post's date.
 Edit Post: Users can edit their posts and view the date of modification. Only the post's owner can edit the post.
 ![yas_so](https://github.com/user-attachments/assets/278f84ec-e17c-4441-b97c-50ff26bc2e60)
-![yas_so](https://github.com/user-attachments/assets/7accd740-61d7-4b42-a794-35184ad580b3)
+![yas_so2](https://github.com/user-attachments/assets/dda515ce-6a55-4d0e-87d1-15e80743f133)
