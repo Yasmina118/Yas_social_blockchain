@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Mini Social Media - Cat Theme</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.7.3/dist/web3.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.16/dist/tailwind.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" rel="stylesheet">
+  <style>
+    .like-btn, .dislike-btn {
+      transition: color 0.3s ease;
+    }
+    .like-btn.active {
+      color: #9B59B6;
+    }
+    .dislike-btn.active {
+      color: #8E44AD;
+    }
+    body {
+      background-image: url('cat_bg.png');
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-position: center;
+      font-family: 'Arial', sans-serif;
+    }
+    .bg-purple {
+      background-color: #9B59B6;
+    }
+    .bg-purple-dark {
+      background-color: #8E44AD;
+    }
+    .text-purple {
+      color: #9B59B6;
+    }
+    .text-purple-dark {
+      color: #8E44AD;
+    }
+    .container {
+      backdrop-filter: blur(10px);
+      background-color: rgba(255, 255, 255, 0.8);
+    }
+  </style>
+</head>
+<body>
+  <div class="container max-w-6xl mx-auto p-6 mt-10 rounded-lg shadow-lg">
+    <header class="bg-purple-dark py-4 rounded-t-lg">
+      <div class="px-6 flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-white">Yas Social Media</h1>
+        <div class="flex items-center">
+          <button id="connect-btn" class="bg-purple hover:bg-purple-dark text-white font-bold py-2 px-4 rounded mr-4">
+            Connect to Metamask
+          </button>
+          <span id="current-account" class="text-white"></span>
+        </div>
+      </div>
+    </header>
+
+    <div class="p-6">
+      <div class="bg-white shadow-md rounded-lg p-6 mb-6">
+        <h2 class="text-xl font-bold mb-4 text-purple-dark">Create Post</h2>
+        <textarea id="new-post" class="w-full border rounded p-2 mb-4" placeholder="Write a new post (max 140 characters)" maxlength="140"></textarea>
+        <div class="flex justify-end">
+          <button id="publish-btn" class="bg-purple hover:bg-purple-dark text-white font-bold py-2 px-4 rounded">Publish Post</button>
+        </div>
+      </div>
+
+      <div class="bg-white shadow-md rounded-lg p-6">
+        <h2 class="text-xl font-bold mb-4 text-purple-dark">News Feed</h2>
+        <div id="posts"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Contract ABI and address
+    const CONTRACT_ABI = [
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			}
+		],
+		"name": "addDisLike",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			}
+		],
+		"name": "addLike",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "Message",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "PostOwner",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "PostTime",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "PostId",
+				"type": "uint256"
+			}
+		],
+		"name": "NewPostEvent",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "NewMessage",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "PostId",
+				"type": "uint256"
+			}
+		],
+		"name": "PostUpdatedEvent",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "_message",
+				"type": "string"
+			}
+		],
+		"name": "publishPost",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_postId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "string",
+				"name": "_newMessage",
+				"type": "string"
+			}
+		],
+		"name": "updatePost",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "index",
+				"type": "uint256"
+			}
+		],
+		"name": "getPost",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			},
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			}
+		],
+		"name": "GetPostAuthor",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			}
+		],
+		"name": "GetPostCreatedAt",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			}
+		],
+		"name": "GetPostDisLikes",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			}
+		],
+		"name": "GetPostLikes",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "GetPosts",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "uint256",
+						"name": "id",
+						"type": "uint256"
+					},
+					{
+						"internalType": "string",
+						"name": "message",
+						"type": "string"
+					},
+					{
+						"internalType": "address",
+						"name": "author",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "num_likes",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "num_dislikes",
+						"type": "uint256"
+					},
+					{
+						"internalType": "address[]",
+						"name": "likedBy",
+						"type": "address[]"
+					},
+					{
+						"internalType": "address[]",
+						"name": "dislikedBy",
+						"type": "address[]"
+					},
+					{
+						"internalType": "uint256",
+						"name": "createdAt",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "updatedAt",
+						"type": "uint256"
+					}
+				],
+				"internalType": "struct MiniSocial.Post[]",
+				"name": "",
+				"type": "tuple[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			}
+		],
+		"name": "GetPostUpdatedAt",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getTotalPosts",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
+];
+    const CONTRACT_ADDRESS = '0xbdEd0D2bf404bdcBa897a74E6657f1f12e5C6fb6';
+
+    let web3, contract, currentAccount, accounts;
+
+    // Connect to Metamask
+    async function connectToMetamask() {
+      if (window.ethereum) {
+        web3 = new Web3(window.ethereum);
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
+        accounts = await web3.eth.getAccounts();
+        currentAccount = accounts[0];
+        contract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
+        updateCurrentAccount();
+        await loadPosts();
+      } else {
+        alert('Metamask not detected');
+      }
+    }
+
+    // Load posts
+    async function loadPosts() {
+      const totalPosts = await contract.methods.getTotalPosts().call();
+      const postsDiv = document.getElementById('posts');
+      postsDiv.innerHTML = '';
+
+      for (let i = 0; i < totalPosts; i++) {
+        const post = await contract.methods.getPost(i).call();
+        const postLikes = await contract.methods.GetPostLikes(i).call();
+        const postDisLikes = await contract.methods.GetPostDisLikes(i).call();
+        const postCreatedAt = await contract.methods.GetPostCreatedAt(i).call();
+        const postUpdatedAt = await contract.methods.GetPostUpdatedAt(i).call();
+        const postDiv = document.createElement('div');
+        postDiv.className = 'bg-white shadow-md rounded-lg p-4 mb-4';
+        postDiv.innerHTML = `
+          <div class="text-gray-800 mb-2">${post[0]}</div>
+          <div class="flex justify-between items-center text-gray-500 text-sm">
+            <div>
+              <span>Author: ${post[1]}</span>
+              <span class="ml-4">Created: ${formatTimestamp(postCreatedAt)}</span>
+              <span class="ml-4">Updated: ${formatTimestamp(postUpdatedAt)}</span>
+            </div>
+            <div>
+              <span class="mr-4">
+                <i class="fas fa-paw like-btn ${hasLiked(i, post[1]) ? 'active' : ''}" onclick="likePost(${i})"></i> ${postLikes}
+              </span>
+              <span>
+                <i class="fas fa-cat dislike-btn ${hasDisliked(i, post[1]) ? 'active' : ''}" onclick="dislikePost(${i})"></i> ${postDisLikes}
+              </span>
+            </div>
+          </div>
+          <div class="flex justify-between items-center mt-2">
+            <button onclick="updatePost(${i})" class="bg-purple hover:bg-purple-dark text-white font-bold py-1 px-2 rounded">Update</button>
+            <div>
+              <span class="mr-2 text-purple-dark">Like</span>
+              <span class="text-purple-dark">Dislike</span>
+            </div>
+          </div>
+        `;
+        postsDiv.appendChild(postDiv);
+      }
+    }
+
+    // Publish a new post
+    async function publishPost() {
+      const newPostInput = document.getElementById('new-post');
+      const newPostMessage = newPostInput.value;
+      if (newPostMessage.trim().length <= 140) {
+        try {
+          await contract.methods.publishPost(newPostMessage).send({ from: currentAccount });
+          newPostInput.value = '';
+          await loadPosts();
+        } catch (error) {
+          alert(`Error publishing post: ${error.message}`);
+        }
+      } else {
+        alert('Post message must be 140 characters or less.');
+      }
+    }
+
+    // Like a post
+    async function likePost(index) {
+      try {
+        await contract.methods.addLike(index).send({ from: currentAccount });
+        await loadPosts();
+      } catch (error) {
+        alert(`Error liking post: ${error.message}`);
+      }
+    }
+
+    // Dislike a post
+    async function dislikePost(index) {
+      try {
+        await contract.methods.addDisLike(index).send({ from: currentAccount });
+        await loadPosts();
+      } catch (error) {
+        alert(`Error disliking post: ${error.message}`);
+      }
+    }
+
+    // Update a post
+    async function updatePost(index) {
+      try {
+        const newPostMessage = prompt("Enter the new post message (max 140 characters):");
+        if (newPostMessage && newPostMessage.trim().length <= 140) {
+          await contract.methods.updatePost(index + 1, newPostMessage).send({ from: currentAccount });
+          await loadPosts();
+        } else {
+          alert("Post message must be 140 characters or less.");
+        }
+      } catch (error) {
+        alert(`Error updating post: ${error.message}`);
+      }
+    }
+
+    // Check if the user has liked/disliked a post
+    function hasLiked(index, author) {
+      const likeButton = document.querySelector(`.like-btn[onclick="likePost(${index})"]`);
+      return likeButton && likeButton.classList.contains('active') && author === currentAccount;
+    }
+
+    function hasDisliked(index, author) {
+      const dislikeButton = document.querySelector(`.dislike-btn[onclick="dislikePost(${index})"]`);
+      return dislikeButton && dislikeButton.classList.contains('active') && author === currentAccount;
+    }
+
+    // Update the display of the current account
+    function updateCurrentAccount() {
+      const currentAccountElement = document.getElementById('current-account');
+      currentAccountElement.textContent = `Current Account: ${currentAccount}`;
+    }
+
+    // Format a Unix timestamp to a readable date
+    function formatTimestamp(timestamp) {
+      const date = new Date(timestamp * 1000);
+      return date.toLocaleString();
+    }
+
+    document.getElementById('connect-btn').addEventListener('click', connectToMetamask);
+    document.getElementById('publish-btn').addEventListener('click', publishPost);
+  </script>
+</body>
+</html>
